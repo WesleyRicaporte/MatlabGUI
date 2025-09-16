@@ -51,8 +51,8 @@ A MATLAB App Designer GUI that loads an ECG record, plots the signal, detects QR
 
 ## Algorithms
 
--QRS detection uses a derivative, squaring, moving average integration, and a threshold
--Smoothing uses a moving average or similar low-pass filter
--BPM is computed from the median R-R interval in the current time window
+- QRS detection uses a derivative, squaring, moving average integration, and a threshold
+- Smoothing uses a moving average or similar low-pass filter
+- BPM is computed from the median R-R interval in the current time window
 
 
