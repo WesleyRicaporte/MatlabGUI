@@ -1,0 +1,375 @@
+classdef App < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure                    matlab.ui.Figure
+        ToolsPanel                  matlab.ui.container.Panel
+        xminsecEditField            matlab.ui.control.NumericEditField
+        xminsecLabel                matlab.ui.control.Label
+        xmaxsecEditField            matlab.ui.control.NumericEditField
+        xmaxsecEditFieldLabel       matlab.ui.control.Label
+        UpdateBPMButton             matlab.ui.control.StateButton
+        SmoothingFilterSwitch       matlab.ui.control.Switch
+        SmoothingFilterSwitchLabel  matlab.ui.control.Label
+        QRSSwitch                   matlab.ui.control.ToggleSwitch
+        QRSSwitchLabel              matlab.ui.control.Label
+        BPMEditField                matlab.ui.control.NumericEditField
+        BPMEditFieldLabel           matlab.ui.control.Label
+        PatientDropDown             matlab.ui.control.DropDown
+        PatientDropDownLabel        matlab.ui.control.Label
+        UIAxes                      matlab.ui.control.UIAxes
+    end
+
+    
+    properties (Access = private)
+        data;
+    end
+    
+    
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Code that executes after component creation
+        function startupFcn(app)
+        patientfiles = dir('*.mat');
+        my_items = {};
+        for n = 1:length(patientfiles)
+            Name{n} = patientfiles(n).name(1:4);
+            [app.data.(['p_' Name{n}]).t, app.data.(['p_' Name{n}]).ecg, ...
+                app.data.(['p_' Name{n}]).FS] = LoadMITecg(Name{n});
+            my_items{n} = ['p_' Name{n}];
+        
+        end
+        %Updates graph right away and adjust later
+        xlabel(app.UIAxes, 'Time (s)');
+        ylabel(app.UIAxes, 'Amplitude (mV)');
+        title(app.UIAxes, 'ECG Signal Graph');
+
+        app.PatientDropDown.Items = my_items;
+        end
+
+        % Value changed function: PatientDropDown
+        function PatientDropDownValueChanged(app, event)
+            %Did this in class but added somethings for adjustable axis
+            value = app.PatientDropDown.Value;
+            t = app.data.(value).t;
+            ecg = app.data.(value).ecg;
+            
+            xmin = 0;
+            xmax = 10;
+            xmin = min(t);
+            xmax = min(t) + 10;
+            if xmax > max(t)
+                xmax = max(t);
+            end
+       
+            app.xminsecEditField.Value = xmin;
+            app.xmaxsecEditField.Value = xmax;
+
+            if app.xmaxsecEditField.Value > max(t)
+                app.xmaxsecEditField.Value = max(t);
+            end
+            plot(app.UIAxes, t, ecg, 'LineWidth', 1.2);
+            
+            
+            xlabel(app.UIAxes, 'Time (s)');
+            ylabel(app.UIAxes, 'Amplitude (mV)');
+            title(app.UIAxes, ['ECG Signal for ' value]);
+        end
+
+        % Value changed function: SmoothingFilterSwitch
+        function SmoothingFilterSwitchValueChanged(app, event)
+            value = app.SmoothingFilterSwitch.Value;
+            patient = app.PatientDropDown.Value;
+            t = app.data.(patient).t;
+            ecg_raw = app.data.(patient).ecg;
+        
+            xmin = app.xminsecEditField.Value;
+            xmax = app.xmaxsecEditField.Value;
+        
+            % Get data in window
+            idx = (t >= xmin) & (t <= xmax);
+            t_window = t(idx);
+            ecg_window = ecg_raw(idx);
+        
+            %Alex helped me with this section because smoothing function
+            % does not behave correctly
+            if strcmp(value, 'On')
+                % lowpass + highpass 
+                Fs = app.data.(patient).FS;
+                % Lowpass at 40 Hz
+                ecg_filtered = lowpass(ecg_raw, 40, Fs);   
+                % Highpass at .5 Hz 
+                ecg_filtered = highpass(ecg_filtered, 0.5, Fs);  
+                ecg_window = ecg_filtered(idx);
+            end
+        
+            plot(app.UIAxes, t_window, ecg_window, 'LineWidth', 1.2);
+            xlabel(app.UIAxes, 'Time (s)');
+            ylabel(app.UIAxes, 'Amplitude (mV)');
+            title(app.UIAxes, ['ECG Signal for ' patient]);
+            xlim(app.UIAxes, [xmin, xmax]);
+        end
+
+        % Value changed function: xminsecEditField
+        function xminsecEditFieldValueChanged(app, event)
+            xmin = app.xminsecEditField.Value;
+            xmax = app.xmaxsecEditField.Value;
+            patient = app.PatientDropDown.Value;
+            t = app.data.(patient).t;
+        
+            %condintionals so the code doesnt break
+            if xmin >= xmax
+                uialert(app.UIFigure, 'Start time must be less than end time.', 'Input Error');
+                return;
+            end
+            if xmin < min(t) || xmax > max(t)
+                uialert(app.UIFigure, 'Time bounds must be within the data range.', 'Input Error');
+                return;
+            end
+        
+            % Update x-axis
+            xlim(app.UIAxes, [xmin, xmax]);
+        end
+
+        % Value changed function: xmaxsecEditField
+        function xmaxsecEditFieldValueChanged(app, event)
+            xmin = app.xminsecEditField.Value;
+            xmax = app.xmaxsecEditField.Value;
+            patient = app.PatientDropDown.Value;
+            t = app.data.(patient).t;
+      
+            %condintionals so the code doesnt break
+            if xmin >= xmax
+                uialert(app.UIFigure, 'Start time must be less than end time.', 'Input Error');
+                return;
+            end
+            if xmin < min(t) || xmax > max(t)
+                uialert(app.UIFigure, 'Time bounds must be within the data range.', 'Input Error');
+                return;
+            end
+        
+            % Update x-axis
+            xlim(app.UIAxes, [xmin, xmax]);
+        end
+
+        % Value changed function: BPMEditField
+        function BPMEditFieldValueChanged(app, event)
+           % Alot of this code was from previous assignment
+            patient = app.PatientDropDown.Value;
+            t = app.data.(patient).t;
+            ecg = app.data.(patient).ecg;
+        
+            xmin = app.xminsecEditField.Value;
+            xmax = app.xmaxsecEditField.Value;
+        
+            idx = (t >= xmin) & (t <= xmax);
+            t_window = t(idx);
+            ecg_window = ecg(idx);
+        
+            if length(t_window) < 2
+                app.BPMEditField.Value = 0;
+                return;
+            end
+        
+            % Find R-peaks
+            [~, r_locs] = findpeaks(ecg_window, ...
+                'MinPeakHeight', 0.5, ...
+                'MinPeakDistance', 0.5 * app.data.(patient).FS);
+        
+            % Calculate heart rate
+            if length(r_locs) < 2
+                bpm = 0;
+            else
+                r_times = diff(t_window(r_locs));
+                bpm = 60 / mean(r_times);
+            end
+        
+            app.BPMEditField.Value = bpm;
+            
+        end
+
+        % Value changed function: UpdateBPMButton
+        function UpdateBPMButtonValueChanged(app, event)
+           %Update the BPM when clicked
+           BPMEditFieldValueChanged(app, []);
+            
+        end
+
+        % Value changed function: QRSSwitch
+        function QRSSwitchValueChanged(app, event)
+            % Alot of this code was from previous assignment
+            value = app.QRSSwitch.Value;
+            patient = app.PatientDropDown.Value;
+            t = app.data.(patient).t;
+            ecg = app.data.(patient).ecg;
+        
+            xmin = app.xminsecEditField.Value;
+            xmax = app.xmaxsecEditField.Value;
+        
+            % Get data in window
+            idx = (t >= xmin) & (t <= xmax);
+            t_window = t(idx);
+            ecg_window = ecg(idx);
+        
+            % Plot ECG
+            plot(app.UIAxes, t_window, ecg_window, 'LineWidth', 1.2);
+            title(app.UIAxes, ['ECG Signal for ' patient]);
+            xlim(app.UIAxes, [xmin, xmax]);
+        
+            if strcmp(value, 'On')
+                % Find R-peaks
+                minHeight = 0.3 * max(ecg_window);
+                if isempty(minHeight) || isnan(minHeight) || minHeight == 0
+                    minHeight = 0.5;
+                end
+        
+                [~, r_locs] = findpeaks(ecg_window, ...
+                    'MinPeakHeight', minHeight, ...
+                    'MinPeakDistance', 0.5 * app.data.(patient).FS);
+        
+                hold(app.UIAxes, 'on');
+                plot(app.UIAxes, t_window(r_locs), ecg_window(r_locs), 'ro', 'MarkerSize', 8, 'LineWidth', 1.5);
+                hold(app.UIAxes, 'off');
+            end
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure and hide until all components are created
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Color = [0 0.4471 0.7412];
+            app.UIFigure.Position = [100 100 640 480];
+            app.UIFigure.Name = 'MATLAB App';
+
+            % Create UIAxes
+            app.UIAxes = uiaxes(app.UIFigure);
+            title(app.UIAxes, 'Title')
+            xlabel(app.UIAxes, 'X')
+            ylabel(app.UIAxes, 'Y')
+            zlabel(app.UIAxes, 'Z')
+            app.UIAxes.Position = [1 170 641 311];
+
+            % Create ToolsPanel
+            app.ToolsPanel = uipanel(app.UIFigure);
+            app.ToolsPanel.Title = 'Tools';
+            app.ToolsPanel.BackgroundColor = [0 0.4471 0.7412];
+            app.ToolsPanel.Position = [1 1 641 170];
+
+            % Create PatientDropDownLabel
+            app.PatientDropDownLabel = uilabel(app.ToolsPanel);
+            app.PatientDropDownLabel.HorizontalAlignment = 'right';
+            app.PatientDropDownLabel.Position = [6 123 42 22];
+            app.PatientDropDownLabel.Text = 'Patient';
+
+            % Create PatientDropDown
+            app.PatientDropDown = uidropdown(app.ToolsPanel);
+            app.PatientDropDown.ValueChangedFcn = createCallbackFcn(app, @PatientDropDownValueChanged, true);
+            app.PatientDropDown.Position = [63 123 150 22];
+
+            % Create BPMEditFieldLabel
+            app.BPMEditFieldLabel = uilabel(app.ToolsPanel);
+            app.BPMEditFieldLabel.HorizontalAlignment = 'right';
+            app.BPMEditFieldLabel.FontSize = 24;
+            app.BPMEditFieldLabel.Position = [302 11 57 32];
+            app.BPMEditFieldLabel.Text = 'BPM';
+
+            % Create BPMEditField
+            app.BPMEditField = uieditfield(app.ToolsPanel, 'numeric');
+            app.BPMEditField.ValueChangedFcn = createCallbackFcn(app, @BPMEditFieldValueChanged, true);
+            app.BPMEditField.FontSize = 24;
+            app.BPMEditField.Position = [374 11 89 32];
+
+            % Create QRSSwitchLabel
+            app.QRSSwitchLabel = uilabel(app.ToolsPanel);
+            app.QRSSwitchLabel.HorizontalAlignment = 'center';
+            app.QRSSwitchLabel.Position = [258 5 31 22];
+            app.QRSSwitchLabel.Text = 'QRS';
+
+            % Create QRSSwitch
+            app.QRSSwitch = uiswitch(app.ToolsPanel, 'toggle');
+            app.QRSSwitch.ValueChangedFcn = createCallbackFcn(app, @QRSSwitchValueChanged, true);
+            app.QRSSwitch.Position = [260 63 27 61];
+
+            % Create SmoothingFilterSwitchLabel
+            app.SmoothingFilterSwitchLabel = uilabel(app.ToolsPanel);
+            app.SmoothingFilterSwitchLabel.HorizontalAlignment = 'center';
+            app.SmoothingFilterSwitchLabel.Position = [21 14 92 22];
+            app.SmoothingFilterSwitchLabel.Text = 'Smoothing Filter';
+
+            % Create SmoothingFilterSwitch
+            app.SmoothingFilterSwitch = uiswitch(app.ToolsPanel, 'slider');
+            app.SmoothingFilterSwitch.ValueChangedFcn = createCallbackFcn(app, @SmoothingFilterSwitchValueChanged, true);
+            app.SmoothingFilterSwitch.Position = [41 51 52 23];
+
+            % Create UpdateBPMButton
+            app.UpdateBPMButton = uibutton(app.ToolsPanel, 'state');
+            app.UpdateBPMButton.ValueChangedFcn = createCallbackFcn(app, @UpdateBPMButtonValueChanged, true);
+            app.UpdateBPMButton.Text = 'Update BPM';
+            app.UpdateBPMButton.FontSize = 24;
+            app.UpdateBPMButton.Position = [474 8 151 39];
+
+            % Create xmaxsecEditFieldLabel
+            app.xmaxsecEditFieldLabel = uilabel(app.ToolsPanel);
+            app.xmaxsecEditFieldLabel.HorizontalAlignment = 'right';
+            app.xmaxsecEditFieldLabel.FontSize = 14;
+            app.xmaxsecEditFieldLabel.Position = [320 93 70 22];
+            app.xmaxsecEditFieldLabel.Text = 'xmax(sec)';
+
+            % Create xmaxsecEditField
+            app.xmaxsecEditField = uieditfield(app.ToolsPanel, 'numeric');
+            app.xmaxsecEditField.ValueChangedFcn = createCallbackFcn(app, @xmaxsecEditFieldValueChanged, true);
+            app.xmaxsecEditField.FontSize = 14;
+            app.xmaxsecEditField.Position = [405 92 70 22];
+
+            % Create xminsecLabel
+            app.xminsecLabel = uilabel(app.ToolsPanel);
+            app.xminsecLabel.HorizontalAlignment = 'right';
+            app.xminsecLabel.FontSize = 14;
+            app.xminsecLabel.Position = [320 123 66 22];
+            app.xminsecLabel.Text = 'xmin(sec)';
+
+            % Create xminsecEditField
+            app.xminsecEditField = uieditfield(app.ToolsPanel, 'numeric');
+            app.xminsecEditField.ValueChangedFcn = createCallbackFcn(app, @xminsecEditFieldValueChanged, true);
+            app.xminsecEditField.FontSize = 14;
+            app.xminsecEditField.Position = [405 123 70 22];
+
+            % Show the figure after all components are created
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = App
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            % Execute the startup function
+            runStartupFcn(app, @startupFcn)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
