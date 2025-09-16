@@ -39,20 +39,20 @@ A MATLAB App Designer GUI that loads an ECG record, plots the signal, detects QR
 ## How to use the app
 
 - Select patient
-Use the drop-down to choose a record. The app calls loadMITecg to read it.
+  - Use the drop-down to choose a record. The app calls loadMITecg to read it.
 - Set the time window
-Use the slider or the start and end boxes to pick the time range to display.
+  - Use the slider or the start and end boxes to pick the time range to display.
 - Apply smoothing
-Enable the smoothing option and adjust the window size to reduce noise.
+  - Enable the smoothing option and adjust the window size to reduce noise.
 - Detect QRS
-Enable QRS detection. Peak markers will appear on the plot.
+  - Enable QRS detection. Peak markers will appear on the plot.
 - Read BPM
-The BPM display updates using R-R intervals in the visible window.
+  - The BPM display updates using R-R intervals in the visible window.
 
 ## Algorithms
 
-QRS detection uses a derivative, squaring, moving average integration, and a threshold
-Smoothing uses a moving average or similar low-pass filter
-BPM is computed from the median R-R interval in the current time window
+-QRS detection uses a derivative, squaring, moving average integration, and a threshold
+-Smoothing uses a moving average or similar low-pass filter
+-BPM is computed from the median R-R interval in the current time window
 
 
