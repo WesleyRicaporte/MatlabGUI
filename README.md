@@ -22,17 +22,12 @@ A MATLAB App Designer GUI that loads an ECG record, plots the signal, detects QR
 - `Plot`  helper used by the app to render signals and overlays
 - `MatlabGUI.png`  screenshot of the app
 
-> GitHub may hide the `.mlapp` or `.m` extensions in the file list preview.
-
 ---
 
 ## Requirements
-- MATLAB R2021b or newer recommended  
-- Signal Processing Toolbox helpful but not required  
+- MATLAB R2021b
+- Signal Processing Toolbox  
 - ECG data files
-  - Place records in a `data/` folder or the repo root
-  - MIT-BIH style records or plain arrays are supported
-  - Confirm the sampling rate your files use (360 Hz is common for MIT-BIH)
 
 ---
 
